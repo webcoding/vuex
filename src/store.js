@@ -7,6 +7,8 @@ let Vue // bind on install
 
 export class Store {
   constructor (options = {}) {
+    // 使用构造函数之前，必须保证vuex已注册，使用Vue.use(Vuex)注册vuex
+    // 需要使用的浏览器支持Promise
     assert(Vue, `must call Vue.use(Vuex) before creating a store instance.`)
     assert(typeof Promise !== 'undefined', `vuex requires a Promise polyfill in this browser.`)
 
@@ -28,6 +30,8 @@ export class Store {
 
     // bind commit and dispatch to self
     const store = this
+
+    // Store.prototype.dispatch 和 Store.prototype.commit
     const { dispatch, commit } = this
     this.dispatch = function boundDispatch (type, payload) {
       return dispatch.call(store, type, payload)
@@ -42,10 +46,15 @@ export class Store {
     // init root module.
     // this also recursively registers all sub-modules
     // and collects all module getters inside this._wrappedGetters
+    // 初始化 root module
+    // 同时也会递归初始化所有子module
+    // 并且收集所有的getters至this._wrappedGetters
     installModule(this, state, [], this._modules.root)
 
     // initialize the store vm, which is responsible for the reactivity
     // (also registers _wrappedGetters as computed properties)
+    // 重置vm实例状态
+    // 同时在这里把getters转化为computed(计算属性)
     resetStoreVM(this, state)
 
     // apply plugins
@@ -221,6 +230,15 @@ function resetStoreVM (store, state, hot) {
   }
 }
 
+/**
+ * installModule
+ *
+ * @param {Object} store 就是 store 实例
+ * @param {Object} rootState 是使用构造函数options中定义的 state 对象
+ * @param {Array} path 路径
+ * @param {Object} module 传入的options
+ * @param {Boolean} hot
+ */
 function installModule (store, rootState, path, module, hot) {
   const isRoot = !path.length
   const namespace = store._modules.getNamespace(path)
@@ -232,9 +250,14 @@ function installModule (store, rootState, path, module, hot) {
 
   // set state
   if (!isRoot && !hot) {
+    // 找到要注册的 path 的上一级 state
+    // 定义 module 的 name
     const parentState = getNestedState(rootState, path.slice(0, -1))
     const moduleName = path[path.length - 1]
     store._withCommit(() => {
+      // 使用Vue.set方法
+      // parentState[moduleName] = state
+      // 并且state变成响应式的
       Vue.set(parentState, moduleName, module.state)
     })
   }
@@ -341,9 +364,25 @@ function makeLocalGetters (store, namespace) {
   return gettersProxy
 }
 
+/**
+ *  注册mutations，也就是给store._mutations添加属性
+ *
+ * @param {Object} store
+ * @param {any} type
+ * @param {any} handler 就是 mutations[key]，也就是传入 Store构造函数的 mutations
+ * @param {any} local
+ */
 function registerMutation (store, type, handler, local) {
+  // 在_mutations中找到对应type的mutation数组
+  // 如果是第一次创建，就初始化为一个空数组
   const entry = store._mutations[type] || (store._mutations[type] = [])
+
+  // 推入一个对原始mutations[key]包装过的函数
   entry.push(function wrappedMutationHandler (payload) {
+    // store.state表示root state, 先获取path路径下的local state
+    // mutation应该是对path路径下的state的修改
+    // 函数接受一个payload参数
+    // 初始的handler，接受一个state he payload 参数
     handler(local.state, payload)
   })
 }
@@ -359,6 +398,9 @@ function registerAction (store, type, handler, local) {
       rootGetters: store.getters,
       rootState: store.state
     }, payload, cb)
+
+    // 如果 res 不是 promise 对象 ，将其转化为promise对象
+    // 这是因为store.dispatch 方法里的 Promise.all()方法
     if (!isPromise(res)) {
       res = Promise.resolve(res)
     }
@@ -394,6 +436,13 @@ function enableStrictMode (store) {
   }, { deep: true, sync: true })
 }
 
+/**
+ * 函数返回结果是state[a][b][c]
+ *
+ * @param {Object} state
+ * @param {Array} path
+ * @returns
+ */
 function getNestedState (state, path) {
   return path.length
     ? path.reduce((state, key) => state[key], state)

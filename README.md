@@ -1,3 +1,9 @@
+
+# 源码分析
+
+- [vuex 2.0源码解读（一）](https://segmentfault.com/a/1190000007108052)
+
+
 # Vuex [![Build Status](https://circleci.com/gh/vuejs/vuex/tree/dev.png?style=shield)](https://circleci.com/gh/vuejs/vuex)
 
 > Centralized State Management for Vue.js.
