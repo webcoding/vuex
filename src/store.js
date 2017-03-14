@@ -7,21 +7,25 @@ let Vue // bind on install
 
 export class Store {
   constructor (options = {}) {
+    // 断言函数 来判断是否满足一些条件
     // 使用构造函数之前，必须保证vuex已注册，使用Vue.use(Vuex)注册vuex
-    // 需要使用的浏览器支持Promise
+    // 需要使用的浏览器支持Promise，否则就要在入口用 import 'babel-polyfill'
+    //    编译代码（现在不必了，开发环境引入 babel 配置，编译后输出即可）
     assert(Vue, `must call Vue.use(Vuex) before creating a store instance.`)
     assert(typeof Promise !== 'undefined', `vuex requires a Promise polyfill in this browser.`)
 
     const {
-      state = {},
-      plugins = [],
-      strict = false
+      state = {},     // 表示rootState
+      plugins = [],   // 应用的插件
+      strict = false  // 严格模式，开发模式才能开启，否则影响性能
     } = options
 
     // store internal state
+    // 标志一个提交状态，作用是保证对 Vuex 中 state 的修改只能在 mutation 的回调函数中，
+    // 而不能在外部随意修改 state。
     this._committing = false
-    this._actions = Object.create(null)
-    this._mutations = Object.create(null)
+    this._actions = Object.create(null)     // 存储用户定义的所有的 actions
+    this._mutations = Object.create(null)   // 存储用户定义所有的 mutatins
     this._wrappedGetters = Object.create(null)
     this._modules = new ModuleCollection(options)
     this._modulesNamespaceMap = Object.create(null)
@@ -462,6 +466,7 @@ function unifyObjectStyle (type, payload, options) {
 }
 
 export function install (_Vue) {
+  // 确保只执行一次
   if (Vue) {
     console.error(
       '[vuex] already installed. Vue.use(Vuex) should be called only once.'

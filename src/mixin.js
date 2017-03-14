@@ -1,3 +1,10 @@
+
+/**
+ * 在 Vue 的生命周期中的初始化
+ *    1.0 版本是 init，2.0 版本是 beforeCreated 钩子前插入一段 Vuex 初始化代码
+ * 目的是给 Vue 的实例注入一个 $store 的属性（this.$store.xxx）
+ */
+
 export default function (Vue) {
   const version = Number(Vue.version.split('.')[0])
 

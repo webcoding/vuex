@@ -61,6 +61,13 @@ export function isPromise (val) {
   return val && typeof val.then === 'function'
 }
 
+/**
+ * 如果不不为真，则抛出异常
+ * 这个函数虽然简单，但这种编程方式值得我们学习
+ *
+ * @param {Boolean} condition
+ * @param {String} msg
+ */
 export function assert (condition, msg) {
   if (!condition) throw new Error(`[vuex] ${msg}`)
 }
