@@ -25,7 +25,7 @@ const store = new Vuex.Store({
 })
 ```
 
-Обработчики действий получают объект контекста, содержащий те же методы и свойства, что и сам инстанс хранилища, так что вы можете вызвать `context.commit` для инициирования мутации или обратиться к состоянию и геттерам через `context.state` и `context.getters`. Позднее при рассмотрении [Модулей](modules.md) мы увидим, однако, что этот контекст — не то же самое, что инстанс хранилища.
+Обработчики действий получают объект контекста, содержащий те же методы и свойства, что и сам экземпляр хранилища, так что вы можете вызвать `context.commit` для инициирования мутации или обратиться к состоянию и геттерам через `context.state` и `context.getters`. Позднее при рассмотрении [Модулей](modules.md) мы увидим, однако, что этот контекст — не то же самое, что экземпляр хранилища.
 
 На практике для упрощения кода часто используется [деструктуризация аргументов](https://github.com/lukehoban/es6features#destructuring) из ES2015 (особенно при необходимости многократного вызова `commit`):
 
@@ -107,13 +107,13 @@ export default {
   // ...
   methods: {
     ...mapActions([
-      'increment' // проксирует this.increment() в this.$store.dispatch('increment')
+      'increment' // проксирует `this.increment()` в `this.$store.dispatch('increment')`
 
-      // mapActions также поддерживают нагрузку (payloads):
-      'incrementBy' // проксирует this.incrementBy(amount) в this.$store.dispatch('incrementBy', amount)
+      // `mapActions` также поддерживают нагрузку (payloads):
+      'incrementBy' // проксирует `this.incrementBy(amount)` в `this.$store.dispatch('incrementBy', amount)`
     ]),
     ...mapActions({
-      add: 'increment' // проксирует this.add() в this.$store.dispatch('increment')
+      add: 'increment' // проксирует `this.add()` в `this.$store.dispatch('increment')`
     })
   }
 }
@@ -123,7 +123,7 @@ export default {
 
 Раз действия зачастую асинхронны, то как узнать, что действие уже завершилось? И, что важнее, как быть со связанными между собой действиями при организации более сложных асинхронных потоков?
 
-Для начала стоит вспомнить, что `store.dispatch` возвращает значение, равное результату вызванного обработчика действия, что позволяет использовать Promise:
+Первое, что нужно знать — `store.dispatch` может обрабатывать Promise, возвращаемый обработчиком действия, и также возвращает Promise:
 
 ``` js
 actions: {
@@ -162,14 +162,14 @@ actions: {
 И, в конце концов, используя [async / await](https://tc39.github.io/ecmascript-asyncawait/) — возможности, которые вот-вот станут общедоступны - можно компоновать действия таким образом:
 
 ``` js
-// предположим, что getData() и getOtherData() возвращают промисы
+// предположим, что `getData()` и `getOtherData()` возвращают промисы
 
 actions: {
   async actionA ({ commit }) {
     commit('gotData', await getData())
   },
   async actionB ({ dispatch, commit }) {
-    await dispatch('actionA') // дожидаемся завершения действия actionA
+    await dispatch('actionA') // дожидаемся завершения действия `actionA`
     commit('gotOtherData', await getOtherData())
   }
 }

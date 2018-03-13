@@ -1,5 +1,5 @@
 import { Store, install } from './store'
-import { mapState, mapMutations, mapGetters, mapActions } from './helpers'
+import { mapState, mapMutations, mapGetters, mapActions, createNamespacedHelpers } from './helpers'
 
 /**
  * 暴露的 API，一目了然
@@ -14,5 +14,6 @@ export default {
   mapState,
   mapMutations,
   mapGetters,
-  mapActions
+  mapActions,
+  createNamespacedHelpers
 }

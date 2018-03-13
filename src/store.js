@@ -7,27 +7,47 @@ let Vue // bind on install
 
 export class Store {
   constructor (options = {}) {
-    // 断言函数 来判断是否满足一些条件
-    // 使用构造函数之前，必须保证vuex已注册，使用Vue.use(Vuex)注册vuex
-    // 需要使用的浏览器支持Promise，否则就要在入口用 import 'babel-polyfill'
-    //    编译代码（现在不必了，开发环境引入 babel 配置，编译后输出即可）
-    assert(Vue, `must call Vue.use(Vuex) before creating a store instance.`)
-    assert(typeof Promise !== 'undefined', `vuex requires a Promise polyfill in this browser.`)
+
+    // Auto install if it is not done yet and `window` has `Vue`.
+    // To allow users to avoid auto-installation in some cases,
+    // this code should be placed here. See #731
+    if (!Vue && typeof window !== 'undefined' && window.Vue) {
+      install(window.Vue)
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      // 断言函数 来判断是否满足一些条件
+      // 使用构造函数之前，必须保证vuex已注册，使用Vue.use(Vuex)注册vuex
+      // 需要使用的浏览器支持Promise，否则就要在入口用 import 'babel-polyfill'
+      //    编译代码（现在不必了，开发环境引入 babel 配置，编译后输出即可）
+      assert(Vue, `must call Vue.use(Vuex) before creating a store instance.`)
+      assert(typeof Promise !== 'undefined', `vuex requires a Promise polyfill in this browser.`)
+      assert(this instanceof Store, `Store must be called with the new operator.`)
+    }
 
     const {
-      state = {},     // 表示rootState
       plugins = [],   // 应用的插件
       strict = false  // 严格模式，开发模式才能开启，否则影响性能
     } = options
+
+    let {
+      state = {}     // 表示rootState
+    } = options
+    if (typeof state === 'function') {
+      state = state() || {}
+    }
 
     // store internal state
     // 标志一个提交状态，作用是保证对 Vuex 中 state 的修改只能在 mutation 的回调函数中，
     // 而不能在外部随意修改 state。
     this._committing = false
-    this._actions = Object.create(null)     // 存储用户定义的所有的 actions
-    this._mutations = Object.create(null)   // 存储用户定义的所有的 mutatins
-    this._wrappedGetters = Object.create(null)      // 存储用户定义的所有的 getters
-    this._modules = new ModuleCollection(options)   // 存储用户定义的所有的 modules
+
+    // 存储用户定义的所有的 actions mutatins getters modules
+    this._actions = Object.create(null)
+    this._actionSubscribers = []
+    this._mutations = Object.create(null)
+    this._wrappedGetters = Object.create(null)
+    this._modules = new ModuleCollection(options)
     this._modulesNamespaceMap = Object.create(null)
     this._subscribers = []        // 存储所有对 mutation 变化的订阅者
     this._watcherVM = new Vue()   // 是一个 Vue 对象的实例，主要是利用 Vue 实例方法 $watch 来观测变化的
@@ -65,7 +85,11 @@ export class Store {
     resetStoreVM(this, state)
 
     // apply plugins
-    plugins.concat(devtoolPlugin).forEach(plugin => plugin(this))
+    plugins.forEach(plugin => plugin(this))
+
+    if (Vue.config.devtools) {
+      devtoolPlugin(this)
+    }
   }
 
   get state () {
@@ -73,7 +97,9 @@ export class Store {
   }
 
   set state (v) {
-    assert(false, `Use store.replaceState() to explicit replace store state.`)
+    if (process.env.NODE_ENV !== 'production') {
+      assert(false, `Use store.replaceState() to explicit replace store state.`)
+    }
   }
 
   /**
@@ -96,7 +122,9 @@ export class Store {
     const mutation = { type, payload }
     const entry = this._mutations[type]
     if (!entry) {
-      console.error(`[vuex] unknown mutation type: ${type}`)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(`[vuex] unknown mutation type: ${type}`)
+      }
       return
     }
     this._withCommit(() => {
@@ -106,7 +134,10 @@ export class Store {
     })
     this._subscribers.forEach(sub => sub(mutation, this.state))
 
-    if (options && options.silent) {
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      options && options.silent
+    ) {
       console.warn(
         `[vuex] mutation type: ${type}. Silent option has been removed. ` +
         'Use the filter functionality in the vue-devtools'
@@ -121,31 +152,34 @@ export class Store {
       payload
     } = unifyObjectStyle(_type, _payload)
 
+    const action = { type, payload }
     const entry = this._actions[type]
     if (!entry) {
-      console.error(`[vuex] unknown action type: ${type}`)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(`[vuex] unknown action type: ${type}`)
+      }
       return
     }
+
+    this._actionSubscribers.forEach(sub => sub(action, this.state))
+
     return entry.length > 1
       ? Promise.all(entry.map(handler => handler(payload)))
       : entry[0](payload)
   }
 
   subscribe (fn) {
-    const subs = this._subscribers
-    if (subs.indexOf(fn) < 0) {
-      subs.push(fn)
-    }
-    return () => {
-      const i = subs.indexOf(fn)
-      if (i > -1) {
-        subs.splice(i, 1)
-      }
-    }
+    return genericSubscribe(fn, this._subscribers)
+  }
+
+  subscribeAction (fn) {
+    return genericSubscribe(fn, this._actionSubscribers)
   }
 
   watch (getter, cb, options) {
-    assert(typeof getter === 'function', `store.watch only accepts a function.`)
+    if (process.env.NODE_ENV !== 'production') {
+      assert(typeof getter === 'function', `store.watch only accepts a function.`)
+    }
     return this._watcherVM.$watch(() => getter(this.state, this.getters), cb, options)
   }
 
@@ -155,18 +189,27 @@ export class Store {
     })
   }
 
-  registerModule (path, rawModule) {
+  registerModule (path, rawModule, options = {}) {
     if (typeof path === 'string') path = [path]
-    assert(Array.isArray(path), `module path must be a string or an Array.`)
+
+    if (process.env.NODE_ENV !== 'production') {
+      assert(Array.isArray(path), `module path must be a string or an Array.`)
+      assert(path.length > 0, 'cannot register the root module by using registerModule.')
+    }
+
     this._modules.register(path, rawModule)
-    installModule(this, this.state, path, this._modules.get(path))
+    installModule(this, this.state, path, this._modules.get(path), options.preserveState)
     // reset store to update getters...
     resetStoreVM(this, this.state)
   }
 
   unregisterModule (path) {
     if (typeof path === 'string') path = [path]
-    assert(Array.isArray(path), `module path must be a string or an Array.`)
+
+    if (process.env.NODE_ENV !== 'production') {
+      assert(Array.isArray(path), `module path must be a string or an Array.`)
+    }
+
     this._modules.unregister(path)
     this._withCommit(() => {
       const parentState = getNestedState(this.state, path.slice(0, -1))
@@ -185,6 +228,18 @@ export class Store {
     this._committing = true
     fn()
     this._committing = committing
+  }
+}
+
+function genericSubscribe (fn, subs) {
+  if (subs.indexOf(fn) < 0) {
+    subs.push(fn)
+  }
+  return () => {
+    const i = subs.indexOf(fn)
+    if (i > -1) {
+      subs.splice(i, 1)
+    }
   }
 }
 
@@ -261,7 +316,7 @@ function installModule (store, rootState, path, module, hot) {
   const namespace = store._modules.getNamespace(path)
 
   // register in namespace map
-  if (namespace) {
+  if (module.namespaced) {
     store._modulesNamespaceMap[namespace] = module
   }
 
@@ -288,8 +343,9 @@ function installModule (store, rootState, path, module, hot) {
   })
 
   module.forEachAction((action, key) => {
-    const namespacedType = namespace + key
-    registerAction(store, namespacedType, action, local)
+    const type = action.root ? key : namespace + key
+    const handler = action.handler || action
+    registerAction(store, type, handler, local)
   })
 
   module.forEachGetter((getter, key) => {
@@ -317,7 +373,7 @@ function makeLocalContext (store, namespace, path) {
 
       if (!options || !options.root) {
         type = namespace + type
-        if (!store._actions[type]) {
+        if (process.env.NODE_ENV !== 'production' && !store._actions[type]) {
           console.error(`[vuex] unknown local action type: ${args.type}, global type: ${type}`)
           return
         }
@@ -333,7 +389,7 @@ function makeLocalContext (store, namespace, path) {
 
       if (!options || !options.root) {
         type = namespace + type
-        if (!store._mutations[type]) {
+        if (process.env.NODE_ENV !== 'production' && !store._mutations[type]) {
           console.error(`[vuex] unknown local mutation type: ${args.type}, global type: ${type}`)
           return
         }
@@ -401,14 +457,14 @@ function registerMutation (store, type, handler, local) {
     // mutation应该是对path路径下的state的修改
     // 函数接受一个payload参数
     // 初始的handler，接受一个state he payload 参数
-    handler(local.state, payload)
+    handler.call(store, local.state, payload)
   })
 }
 
 function registerAction (store, type, handler, local) {
   const entry = store._actions[type] || (store._actions[type] = [])
   entry.push(function wrappedActionHandler (payload, cb) {
-    let res = handler({
+    let res = handler.call(store, {
       dispatch: local.dispatch,
       commit: local.commit,
       getters: local.getters,
@@ -435,7 +491,9 @@ function registerAction (store, type, handler, local) {
 
 function registerGetter (store, type, rawGetter, local) {
   if (store._wrappedGetters[type]) {
-    console.error(`[vuex] duplicate getter key: ${type}`)
+    if (process.env.NODE_ENV !== 'production') {
+      console.error(`[vuex] duplicate getter key: ${type}`)
+    }
     return
   }
   store._wrappedGetters[type] = function wrappedGetter (store) {
@@ -450,7 +508,9 @@ function registerGetter (store, type, rawGetter, local) {
 
 function enableStrictMode (store) {
   store._vm.$watch(function () { return this._data.$$state }, () => {
-    assert(store._committing, `Do not mutate vuex store state outside mutation handlers.`)
+    if (process.env.NODE_ENV !== 'production') {
+      assert(store._committing, `Do not mutate vuex store state outside mutation handlers.`)
+    }
   }, { deep: true, sync: true })
 }
 
@@ -474,24 +534,23 @@ function unifyObjectStyle (type, payload, options) {
     type = type.type
   }
 
-  assert(typeof type === 'string', `Expects string as the type, but found ${typeof type}.`)
+  if (process.env.NODE_ENV !== 'production') {
+    assert(typeof type === 'string', `Expects string as the type, but found ${typeof type}.`)
+  }
 
   return { type, payload, options }
 }
 
 export function install (_Vue) {
   // 确保只执行一次
-  if (Vue) {
-    console.error(
-      '[vuex] already installed. Vue.use(Vuex) should be called only once.'
-    )
+  if (Vue && _Vue === Vue) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error(
+        '[vuex] already installed. Vue.use(Vuex) should be called only once.'
+      )
+    }
     return
   }
   Vue = _Vue
   applyMixin(Vue)
-}
-
-// auto install in dist mode
-if (typeof window !== 'undefined' && window.Vue) {
-  install(window.Vue)
 }
