@@ -12,11 +12,11 @@ const store = new Vuex.Store({ ...options })
 
 - **state**
 
-  - type: `Object`
+  - type: `Object | Function`
 
-    The root state object for the Vuex store.
+    The root state object for the Vuex store. [Details](state.md)
 
-    [Details](state.md)
+    If you pass a function that returns an object, the returned object is used as the root state. This is useful when you want to reuse the state object especially for module reuse. [Details](modules.md#module-reuse)
 
 - **mutations**
 
@@ -52,9 +52,18 @@ const store = new Vuex.Store({ ...options })
 
     ```
     state,     // will be module local state if defined in a module.
-    getters,   // same as store.getters
-    rootState  // same as store.state
+    getters    // same as store.getters
     ```
+
+    Specific when defined in a module
+
+    ```
+    state,       // will be module local state if defined in a module.
+    getters,     // module local getters of the current module
+    rootState,   // global state
+    rootGetters  // all getters
+    ```
+
     Registered getters are exposed on `store.getters`.
 
     [Details](getters.md)
@@ -116,13 +125,13 @@ const store = new Vuex.Store({ ...options })
 
 ### Vuex.Store Instance Methods
 
-- **`commit(type: string, payload?: any) | commit(mutation: Object)`**
+- **`commit(type: string, payload?: any, options?: Object) | commit(mutation: Object, options?: Object)`**
 
-  Commit a mutation. [Details](mutations.md)
+  Commit a mutation. `options` can have `root: true` that allows to commit root mutations in [namespaced modules](modules.md#namespacing). [Details](mutations.md)
 
-- **`dispatch(type: string, payload?: any) | dispatch(action: Object)`**
+- **`dispatch(type: string, payload?: any, options?: Object) | dispatch(action: Object, options?: Object)`**
 
-  Dispatch an action. Returns a Promise that resolves all triggered action handlers. [Details](actions.md)
+  Dispatch an action. `options` can have `root: true` that allows to dispatch root actions in [namespaced modules](modules.md#namespacing). Returns a Promise that resolves all triggered action handlers. [Details](actions.md)
 
 - **`replaceState(state: Object)`**
 
@@ -147,9 +156,26 @@ const store = new Vuex.Store({ ...options })
 
   Most commonly used in plugins. [Details](plugins.md)
 
-- **`registerModule(path: string | Array<string>, module: Module)`**
+- **`subscribeAction(handler: Function)`**
+
+  > New in 2.5.0
+
+  Subscribe to store actions. The `handler` is called for every dispatched action and receives the action descriptor and current store state as arguments:
+
+  ``` js
+  store.subscribeAction((action, state) => {
+    console.log(action.type)
+    console.log(action.payload)
+  })
+  ```
+
+  Most commonly used in plugins. [Details](plugins.md)
+
+- **`registerModule(path: string | Array<string>, module: Module, options?: Object)`**
 
   Register a dynamic module. [Details](modules.md#dynamic-module-registration)
+
+  `options` can have `preserveState: true` that allows to preserve the previous state. Useful with Server Side Rendering.
 
 - **`unregisterModule(path: string | Array<string>)`**
 
@@ -181,6 +207,10 @@ const store = new Vuex.Store({ ...options })
 
 - **`mapMutations(namespace?: string, map: Array<string> | Object): Object`**
 
-  Create component methods options that commit a mutation. [Details](mutations.md#commiting-mutations-in-components)
+  Create component methods options that commit a mutation. [Details](mutations.md#committing-mutations-in-components)
 
   The first argument can optionally be a namespace string. [Details](modules.md#binding-helpers-with-namespace)
+
+- **`createNamespacedHelpers(namespace: string): Object`**
+
+  Create namespaced component binding helpers. The returned object contains `mapState`, `mapGetters`, `mapActions` and `mapMutations` that are bound with the given namespace. [Details](modules.md#binding-helpers-with-namespace)

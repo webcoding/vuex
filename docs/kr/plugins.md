@@ -70,7 +70,7 @@ const myPluginWithSnapshot = store => {
 }
 ```
 
-**상태 스냅 샷을 사용하는 플러그인은 개발 중에 만 사용해야합니다.** Webpack 또는 Browserify를 사용하는 경우 빌드 도구가 이를 처리 할 수 있습니다.
+**상태 스냅 샷을 사용하는 플러그인은 개발 중에 만 사용해야합니다.** webpack 또는 Browserify를 사용하는 경우 빌드 도구가 이를 처리 할 수 있습니다.
 
 ``` js
 const store = new Vuex.Store({
@@ -81,7 +81,7 @@ const store = new Vuex.Store({
 })
 ```
 
-플러그인은 기본적으로 사용됩니다. 배포를 위해서는 Webpack의 [DefinePlugin](https://webpack.github.io/docs/list-of-plugins.html#defineplugin) 또는 [envify](https://github.com/hughsk/envify)가 필요합니다. Browserify가 `process.env.NODE_ENV !== 'production'`의 값을 최종 빌드를 위해 `false`로 변환합니다.
+플러그인은 기본적으로 사용됩니다. 배포를 위해서는 webpack의 [DefinePlugin](https://webpack.github.io/docs/list-of-plugins.html#defineplugin) 또는 [envify](https://github.com/hughsk/envify)가 필요합니다. Browserify가 `process.env.NODE_ENV !== 'production'`의 값을 최종 빌드를 위해 `false`로 변환합니다.
 
 
 ### 내장 로거 플러그인
@@ -103,6 +103,11 @@ const store = new Vuex.Store({
 ``` js
 const logger = createLogger({
   collapsed: false, // 로그를 가지는 변이 자동 확장
+  filter (mutation, stateBefore, stateAfter) {
+    // returns true if a mutation should be logged
+    // `mutation` is a { type, payload }
+    return mutation.type !== "aBlacklistedMutation"
+  },
   transformer (state) {
     // 로깅하기전 상태를 변이 하십시오.
     // 예를 들어 특정 하위 트리만 반환합니다.

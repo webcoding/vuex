@@ -54,7 +54,7 @@ const store = new Vuex.Store({
 
 ### 生成 State 快照
 
-有时候插件需要获得状态的『快照』，比较改变的前后状态。想要实现这项功能，你需要对状态对象进行深拷贝：
+有时候插件需要获得状态的“快照”，比较改变的前后状态。想要实现这项功能，你需要对状态对象进行深拷贝：
 
 ``` js
 const myPluginWithSnapshot = store => {
@@ -70,7 +70,7 @@ const myPluginWithSnapshot = store => {
 }
 ```
 
-**生成状态快照的插件应该只在开发阶段使用**，使用 Webpack 或 Browserify，让构建工具帮我们处理：
+**生成状态快照的插件应该只在开发阶段使用**，使用 webpack 或 Browserify，让构建工具帮我们处理：
 
 ``` js
 const store = new Vuex.Store({
@@ -81,7 +81,7 @@ const store = new Vuex.Store({
 })
 ```
 
-上面插件会默认启用。在发布阶段，你需要使用 Webpack 的 [DefinePlugin](https://webpack.github.io/docs/list-of-plugins.html#defineplugin) 或者是 Browserify 的 [envify](https://github.com/hughsk/envify) 使 `process.env.NODE_ENV !== 'production'` 为 `false`。
+上面插件会默认启用。在发布阶段，你需要使用 webpack 的 [DefinePlugin](https://webpack.github.io/docs/list-of-plugins.html#defineplugin) 或者是 Browserify 的 [envify](https://github.com/hughsk/envify) 使 `process.env.NODE_ENV !== 'production'` 为 `false`。
 
 ### 内置 Logger 插件
 
@@ -102,6 +102,11 @@ const store = new Vuex.Store({
 ``` js
 const logger = createLogger({
   collapsed: false, // 自动展开记录的 mutation
+  filter (mutation, stateBefore, stateAfter) {
+    // 若 mutation 需要被记录，就让它返回 true 即可
+    // 顺便，`mutation` 是个 { type, payload } 对象
+    return mutation.type !== "aBlacklistedMutation"
+  },
   transformer (state) {
     // 在开始记录之前转换状态
     // 例如，只返回指定的子树
@@ -111,7 +116,8 @@ const logger = createLogger({
     // mutation 按照 { type, payload } 格式记录
     // 我们可以按任意方式格式化
     return mutation.type
-  }
+  },
+  logger: console, // 自定义 console 实现，默认为 `console`
 })
 ```
 
