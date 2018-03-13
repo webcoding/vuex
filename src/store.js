@@ -25,14 +25,15 @@ export class Store {
     // 而不能在外部随意修改 state。
     this._committing = false
     this._actions = Object.create(null)     // 存储用户定义的所有的 actions
-    this._mutations = Object.create(null)   // 存储用户定义所有的 mutatins
-    this._wrappedGetters = Object.create(null)
-    this._modules = new ModuleCollection(options)
+    this._mutations = Object.create(null)   // 存储用户定义的所有的 mutatins
+    this._wrappedGetters = Object.create(null)      // 存储用户定义的所有的 getters
+    this._modules = new ModuleCollection(options)   // 存储用户定义的所有的 modules
     this._modulesNamespaceMap = Object.create(null)
-    this._subscribers = []
-    this._watcherVM = new Vue()
+    this._subscribers = []        // 存储所有对 mutation 变化的订阅者
+    this._watcherVM = new Vue()   // 是一个 Vue 对象的实例，主要是利用 Vue 实例方法 $watch 来观测变化的
 
     // bind commit and dispatch to self
+    // 把 Store 类的 dispatch 和 commit 的方法的 this 指针指向当前 store 的实例上
     const store = this
 
     // Store.prototype.dispatch 和 Store.prototype.commit
@@ -45,14 +46,16 @@ export class Store {
     }
 
     // strict mode
+    // 在严格模式下会观测所有的 state 的变化，建议在开发环境时开启严格模式，
+    // 线上环境要关闭严格模式，否则会有一定的性能开销
     this.strict = strict
 
     // init root module.
     // this also recursively registers all sub-modules
     // and collects all module getters inside this._wrappedGetters
     // 初始化 root module
-    // 同时也会递归初始化所有子module
-    // 并且收集所有的getters至this._wrappedGetters
+    // 同时也会递归初始化所有子 module
+    // 并且收集所有的 getters 至 this._wrappedGetters
     installModule(this, state, [], this._modules.root)
 
     // initialize the store vm, which is responsible for the reactivity
@@ -73,6 +76,15 @@ export class Store {
     assert(false, `Use store.replaceState() to explicit replace store state.`)
   }
 
+  /**
+   * mutation 的调用是通过 store 实例的 API 接口 commit 来调用的
+   *
+   * @param {any} _type     表示 mutation 的类型
+   * @param {any} _payload  表示额外的参数
+   * @param {any} _options  表示一些配置，比如 silent 等
+   *
+   * @memberOf Store
+   */
   commit (_type, _payload, _options) {
     // check object-style commit
     const {
@@ -237,13 +249,14 @@ function resetStoreVM (store, state, hot) {
 /**
  * installModule
  *
- * @param {Object} store 就是 store 实例
- * @param {Object} rootState 是使用构造函数options中定义的 state 对象
- * @param {Array} path 路径
- * @param {Object} module 传入的options
- * @param {Boolean} hot
+ * @param {Object} store 表示当前 Store 实例
+ * @param {Object} rootState 表示根 state，就是使用构造函数options中定义的 state 对象
+ * @param {Array} path 表示当前嵌套模块的路径数组
+ * @param {Object} module 表示当前安装的模块
+ * @param {Boolean} hot 当动态改变 modules 或者热更新的时候为 true
  */
 function installModule (store, rootState, path, module, hot) {
+  // 通过 path 数组的长度判断是否为根
   const isRoot = !path.length
   const namespace = store._modules.getNamespace(path)
 
@@ -253,9 +266,10 @@ function installModule (store, rootState, path, module, hot) {
   }
 
   // set state
+  // 当不为根且非热更新的情况，设置级联状态
   if (!isRoot && !hot) {
-    // 找到要注册的 path 的上一级 state
-    // 定义 module 的 name
+    // 找到要注册的 path 的父模块的 state
+    // 定义 module 的 name（即 path 的最后一个元素）
     const parentState = getNestedState(rootState, path.slice(0, -1))
     const moduleName = path[path.length - 1]
     store._withCommit(() => {
@@ -371,10 +385,10 @@ function makeLocalGetters (store, namespace) {
 /**
  *  注册mutations，也就是给store._mutations添加属性
  *
- * @param {Object} store
- * @param {any} type
- * @param {any} handler 就是 mutations[key]，也就是传入 Store构造函数的 mutations
- * @param {any} local
+ * @param {Object} store 为当前 Store 实例
+ * @param {any} type     为 mutation 的 key
+ * @param {any} handler  mutation 执行的回调函数 mutations[key]，也就是传入 Store构造函数的 mutations
+ * @param {any} local    当前模块?
  */
 function registerMutation (store, type, handler, local) {
   // 在_mutations中找到对应type的mutation数组
