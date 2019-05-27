@@ -1,7 +1,7 @@
 import applyMixin from './mixin'
 import devtoolPlugin from './plugins/devtool'
 import ModuleCollection from './module/module-collection'
-import { forEachValue, isObject, isPromise, assert } from './util'
+import { forEachValue, isObject, isPromise, assert, partial } from './util'
 
 let Vue // bind on install
 
@@ -264,7 +264,9 @@ function resetStoreVM (store, state, hot) {
   // 获取的是store._vm.test，对应Vue对象的computed属性
   forEachValue(wrappedGetters, (fn, key) => {
     // use computed to leverage its lazy-caching mechanism
-    computed[key] = () => fn(store)
+    // direct inline function use will lead to closure preserving oldVm.
+    // using partial to return function with only arguments preserved in closure enviroment.
+    computed[key] = partial(fn, store)
     Object.defineProperty(store.getters, key, {
       get: () => store._vm[key],
       enumerable: true // for local getters
@@ -307,6 +309,9 @@ function installModule (store, rootState, path, module, hot) {
 
   // register in namespace map
   if (module.namespaced) {
+    if (store._modulesNamespaceMap[namespace] && process.env.NODE_ENV !== 'production') {
+      console.error(`[vuex] duplicate namespace ${namespace} for the namespaced module ${path.join('/')}`)
+    }
     store._modulesNamespaceMap[namespace] = module
   }
 
