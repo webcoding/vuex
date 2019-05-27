@@ -26,14 +26,17 @@ export class Store {
     } = options
 
     // store internal state
+    // this._committing 表示提交状态，作用是保证对 Vuex 中 state 的修改只能在 mutation 的回调函数中，而不能在外部随意修改state
     this._committing = false
-    this._actions = Object.create(null)
+    this._actions = Object.create(null) // {}
     this._actionSubscribers = []
     this._mutations = Object.create(null)
     this._wrappedGetters = Object.create(null)
     this._modules = new ModuleCollection(options)
     this._modulesNamespaceMap = Object.create(null)
     this._subscribers = []
+
+    // 利用 Vue 实例方法 $watch 来观测变化的
     this._watcherVM = new Vue()
 
     // bind commit and dispatch to self
@@ -54,6 +57,7 @@ export class Store {
     // init root module.
     // this also recursively registers all sub-modules
     // and collects all module getters inside this._wrappedGetters
+    // 安装根模块
     installModule(this, state, [], this._modules.root)
 
     // initialize the store vm, which is responsible for the reactivity
@@ -96,6 +100,7 @@ export class Store {
       return
     }
     this._withCommit(() => {
+      // 遍历触发事件队列
       entry.forEach(function commitIterator (handler) {
         handler(payload)
       })
@@ -254,6 +259,9 @@ function resetStoreVM (store, state, hot) {
   store.getters = {}
   const wrappedGetters = store._wrappedGetters
   const computed = {}
+
+  // 通过Object.defineProperty为每一个getter方法设置get方法, 比如获取this.$store.getters.test的时候
+  // 获取的是store._vm.test，对应Vue对象的computed属性
   forEachValue(wrappedGetters, (fn, key) => {
     // use computed to leverage its lazy-caching mechanism
     computed[key] = () => fn(store)
@@ -313,6 +321,7 @@ function installModule (store, rootState, path, module, hot) {
 
   const local = module.context = makeLocalContext(store, namespace, path)
 
+  // 注册mutation事件队列
   module.forEachMutation((mutation, key) => {
     const namespacedType = namespace + key
     registerMutation(store, namespacedType, mutation, local)
@@ -394,12 +403,14 @@ function makeLocalContext (store, namespace, path) {
 function makeLocalGetters (store, namespace) {
   const gettersProxy = {}
 
+  // account/
   const splitPos = namespace.length
   Object.keys(store.getters).forEach(type => {
     // skip if the target getter is not match this namespace
     if (type.slice(0, splitPos) !== namespace) return
 
     // extract local getter type
+    // account/userinfo slice account/ => userinfo
     const localType = type.slice(splitPos)
 
     // Add a port to the getters proxy.
